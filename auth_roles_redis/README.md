@@ -14,7 +14,7 @@ function login() {
         id: 111,
         login: "admin",
         pass: "pass",
-        roles: "sddadsddsemin"
+        roles: "admin"
     };
     MODULE('auth').login(self,user.id,user,function(){
         self.plain("Login->Ok!");
