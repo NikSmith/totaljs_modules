@@ -133,4 +133,5 @@ module.exports.uninstall = function(framework, options) {
     framework.removeListener('request', delegate_request);
     framework.uninstall('middleware', 'session');
     session = null;
+    client.end();
 };
