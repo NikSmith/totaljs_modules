@@ -6,6 +6,8 @@ mysqlDB                         : database
 mysqlUser                       : root
 mysqlPassword                   : pass
 mysqlHost                       : host
+
+Don't forget to use connection.closeSync();
 */
 
 var host = framework.config.mysqlHost,
