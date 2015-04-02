@@ -4,35 +4,29 @@
  * @author Peter Å irka
  */
 
+var redis = require('redis');
+var client = redis.createClient();
+
 var events = require('events');
 var SUGAR = 'XY1';
 var USERAGENT = 11;
 var VERSION = 'v1.01';
 
-var stats_read = 0;
-var stats_write = 0;
+var ttl = CONFIG("session_expire") || 3600;
 
 function Session() {
-
     this.options = null;
 
-    /**
-     * Read value from session
-     * @param {String} id
-     * @param {Function(value)} fnCallback
-     */
     this.onRead = function(id, fnCallback) {
-        fnCallback(framework.cache.read(id));
+        client.get('session_' + id, function(err, reply) {
+            fnCallback(err ? {} : reply === null ? {} : JSON.parse(reply.toString()));
+        });
     };
 
-    /**
-     * Write value into the session
-     * @param {String} id
-     * @param {Object} value
-     */
     this.onWrite = function(id, value) {
         var self = this;
-        framework.cache.add(id, value, self.options.timeout);
+        client.set('session_' + id, JSON.stringify(value));
+        client.expire('session_' + id,self.options.timeout || 3600);
         return self;
     };
 }
@@ -40,7 +34,6 @@ function Session() {
 Session.prototype = new events.EventEmitter;
 
 Session.prototype._read = function(req, res, next) {
-
     var self = this;
     var id = req.cookie(self.options.cookie) || '';
 
@@ -63,8 +56,6 @@ Session.prototype._read = function(req, res, next) {
     req._sessionId = obj.id;
     req._session = self;
 
-    stats_read++;
-
     self.onRead(obj.id, function(session) {
         self.emit('read', req._sessionId, session);
         req.session = session || {};
@@ -74,10 +65,18 @@ Session.prototype._read = function(req, res, next) {
     return self;
 };
 
+Session.prototype._write = function(id, obj) {
+    var self = this;
+    self.emit('write', id, obj);
+    if (self.onWrite !== null)
+        self.onWrite(id, obj);
+
+    return self;
+};
+
 Session.prototype._signature = function(id, req) {
     return id + '|' + req.ip.replace(/\./g, '') + '|' + (req.headers['user-agent'] || '').substring(0, USERAGENT).replace(/\s|\./g, '');
 };
-
 Session.prototype._create = function(res, req, next) {
 
     var self = this;
@@ -101,30 +100,12 @@ Session.prototype._create = function(res, req, next) {
     return self;
 };
 
-Session.prototype._write = function(id, obj) {
-    var self = this;
-
-    stats_write++;
-    self.emit('write', id, obj);
-
-    if (self.onWrite !== null)
-        self.onWrite(id, obj);
-
-    return self;
-};
-
 var session = new Session();
 
 module.exports.name = 'session';
 module.exports.version = VERSION;
 module.exports.instance = session;
 
-module.exports.usage = function() {
-    return {
-        read: stats_read,
-        write: stats_write
-    };
-};
 
 module.exports.install = function(framework, options) {
 
@@ -151,7 +132,6 @@ module.exports.install = function(framework, options) {
 
     });
 };
-
 module.exports.uninstall = function(framework, options) {
     framework.removeListener('request', delegate_request);
     framework.uninstall('middleware', 'session');
