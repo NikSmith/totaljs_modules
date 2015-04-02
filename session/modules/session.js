@@ -12,7 +12,6 @@ var SUGAR = 'XY1';
 var USERAGENT = 11;
 var VERSION = 'v1.01';
 
-var ttl = CONFIG("session_expire") || 3600;
 
 function Session() {
     this.options = null;
@@ -115,7 +114,6 @@ module.exports.install = function(framework, options) {
     session.options = Utils.extend({ cookie: '__ssid', secret: 'N84', timeout: '5 minutes' }, options, true);
 
     framework.middleware('session', function(req, res, next) {
-
         if (res.statusCode) {
             // classic HTTP
             res.once('finish', function() {
@@ -127,9 +125,7 @@ module.exports.install = function(framework, options) {
                 session._write(req._sessionId, req.session);
             });
         }
-
         session._read(req, res, next);
-
     });
 };
 module.exports.uninstall = function(framework, options) {
