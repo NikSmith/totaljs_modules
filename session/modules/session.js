@@ -17,16 +17,19 @@ function Session() {
     this.options = null;
 
     this.onRead = function(id, fnCallback) {
-        client.get('session_' + id, function(err, reply) {
+        client.get('session_' + id, function(err,reply){
             fnCallback(err ? {} : reply === null ? {} : JSON.parse(reply.toString()));
         });
     };
 
     this.onWrite = function(id, value) {
         var self = this;
-        client.set('session_' + id, JSON.stringify(value));
-        client.expire('session_' + id,self.options.timeout || 3600);
-        return self;
+        client.set('session_' + id, JSON.stringify(value),function(err){
+            if (!err){
+                client.expire('session_' + id, self.options.timeout,function(){});
+            }
+            return self;
+        });
     };
 }
 
@@ -56,7 +59,6 @@ Session.prototype._read = function(req, res, next) {
     req._session = self;
 
     self.onRead(obj.id, function(session) {
-        self.emit('read', req._sessionId, session);
         req.session = session || {};
         next();
     });
@@ -66,10 +68,8 @@ Session.prototype._read = function(req, res, next) {
 
 Session.prototype._write = function(id, obj) {
     var self = this;
-    self.emit('write', id, obj);
     if (self.onWrite !== null)
         self.onWrite(id, obj);
-
     return self;
 };
 
@@ -107,13 +107,13 @@ module.exports.instance = session;
 
 
 module.exports.install = function(framework, options) {
-
     var self = this;
 
     SUGAR = (framework.config.name + framework.config.version + SUGAR).replace(/\s/g, '');
     session.options = Utils.extend({ cookie: '__ssid', secret: 'N84', timeout: '5 minutes' }, options, true);
 
     framework.middleware('session', function(req, res, next) {
+
         if (res.statusCode) {
             // classic HTTP
             res.once('finish', function() {
@@ -126,6 +126,7 @@ module.exports.install = function(framework, options) {
             });
         }
         session._read(req, res, next);
+
     });
 };
 module.exports.uninstall = function(framework, options) {
