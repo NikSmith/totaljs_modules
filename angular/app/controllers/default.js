@@ -1,0 +1,1 @@
+app.controller("default",function($location){});
